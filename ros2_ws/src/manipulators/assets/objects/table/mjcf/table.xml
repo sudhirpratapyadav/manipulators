@@ -1,0 +1,32 @@
+<mujoco model="table">
+  <!--
+  Table object MJCF with mesh
+  Size: 0.8m x 1.2m x 0.05m (W x D x H)
+  -->
+
+  <compiler meshdir="../meshes" balanceinertia="true" autolimits="true"/>
+
+  <asset>
+    <mesh name="table_mesh" file="table.stl" scale="1 1 0.8"/>
+    <material name="table_mat" rgba="0.8 0.7 0.6 1.0"/>
+  </asset>
+
+  <worldbody>
+    <body name="table" euler="0 0 1.57">
+      <geom name="table_visual"
+            type="mesh"
+            mesh="table_mesh"
+            material="table_mat"
+            contype="0"
+            conaffinity="0"
+            mass="5.0"/>
+      <geom name="table_collision"
+            type="box"
+            size="0.4 0.6 0.34"
+            pos="0 0 0"
+            contype="1"
+            conaffinity="1"
+            rgba="0 0 0 0"/>
+    </body>
+  </worldbody>
+</mujoco>

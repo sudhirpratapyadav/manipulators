@@ -1,0 +1,25 @@
+<?xml version="1.0" ?>
+<mujoco model="scene">
+  <include file="/home/robot/sudhir/controllers/src/assets/robots/kinova/mjcf/gen3_no_keyframes.xml"/>
+  <visual>
+    <global offwidth="1920" offheight="1080"/>
+    <headlight ambient="0.5 0.5 0.5" diffuse="0.8 0.8 0.8"/>
+  </visual>
+  <asset>
+    <mesh name="table_mesh" file="/home/robot/sudhir/controllers/src/assets/objects/table/meshes/table.stl" scale="1 1 0.8"/>
+    <material name="mat_table" rgba="0.8 0.7 0.6 1.0"/>
+    <material name="mat_cube1" rgba="0.2 0.8 0.2 1.0"/>
+  </asset>
+  <worldbody>
+    <light name="light1" pos="1 1 2" dir="-1 -1 -2" diffuse="0.8 0.8 0.8"/>
+    <geom name="floor" type="plane" size="2 2 0.1" rgba="0.9 0.9 0.9 1" contype="1" conaffinity="1" pos="0 0 -0.68"/>
+    <body name="table" pos="-0.4 -0.55 -0.68" quat="1.0 0.0 0.0 0.0">
+      <geom name="table_visual" type="mesh" mesh="table_mesh" contype="0" conaffinity="0" mass="5.0" euler="0 0 1.57" material="mat_table"/>
+      <geom name="table_collision" type="box" size="0.7 0.45 0.33" pos="0 0 0.33" contype="1" conaffinity="1" rgba="0 0 0 0" euler="0 0 1.57"/>
+    </body>
+    <body name="cube1" pos="0.35 0.0 0.05" quat="1.0 0.0 0.0 0.0">
+      <freejoint name="cube1_joint"/>
+      <geom name="cube1_geom" type="box" size="0.025 0.025 0.025" contype="1" conaffinity="1" mass="0.1" material="mat_cube1"/>
+    </body>
+  </worldbody>
+</mujoco>
