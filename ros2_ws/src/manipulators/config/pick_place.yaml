@@ -1,0 +1,35 @@
+pick_place:
+  # Idle/home position (where robot waits)
+  idle_position: [0.4, 0.0, 0.4]  # x, y, z in robot frame
+
+  # Grasp parameters
+  pre_grasp_height: 0.10          # meters above object
+  grasp_height: 0.025             # meters above object (fingertip offset)
+  lift_height: 0.15               # meters above object after grasp
+
+  # Mid-transport waypoint (pass through during transport)
+  mid_transport_position: [0.4, 0.0, 0.35]  # x, y, z
+
+  # Place parameters
+  pre_place_position: [0.4, 0.3, 0.25]   # above place location
+  place_position: [0.4, 0.3, 0.05]       # final place location
+
+  # Grasp orientation (quaternion xyzw) - top-down
+  # This is ~180deg rotation around Y to point gripper down
+  grasp_orientation: [0.0, 0.7071, 0.0, 0.7071]
+
+  # Motion parameters
+  max_linear_velocity: 0.25       # m/s - max target movement speed
+  max_angular_velocity: 1.0       # rad/s - max orientation change speed
+  position_threshold: 0.01        # meters - "arrived" distance
+  orientation_threshold: 0.05    # radians - "arrived" orientation error
+
+  # Timing
+  grasp_settle_time: 0.8          # seconds to wait for gripper to close
+  release_settle_time: 0.5        # seconds to wait for gripper to open
+
+  # Detection
+  detection_timeout: 1.0          # seconds - max age for "fresh" detection
+
+  # Control rate
+  policy_rate: 50.0               # Hz

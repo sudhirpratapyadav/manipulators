@@ -35,6 +35,7 @@ setup(
             'control_node = src.control_node:main',
             'keyboard_teleop = src.keyboard_teleop:main',
             'object_detection_node = src.object_detection_node:main',
+            'pick_place_policy = src.pick_place_policy:main',
             'capture_images = scripts.capture_images:main',
             'calibrate_intrinsics = scripts.calibrate_intrinsics:main',
             'calibrate_extrinsics = scripts.calibrate_extrinsics:main',
