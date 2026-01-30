@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(source:*)",
+      "Bash(source /opt/ros/*/setup.bash)",
+      "Bash(colcon build:*)"
+    ]
+  }
+}

@@ -26,7 +26,7 @@ data_files += collect_data_files('assets')
 setup(
     name=package_name,
     version='0.1.0',
-    packages=['src'],
+    packages=['src', 'src.detectors', 'scripts'],
     data_files=data_files,
     install_requires=['setuptools'],
     zip_safe=True,
@@ -34,6 +34,10 @@ setup(
         'console_scripts': [
             'control_node = src.control_node:main',
             'keyboard_teleop = src.keyboard_teleop:main',
+            'object_detection_node = src.object_detection_node:main',
+            'capture_images = scripts.capture_images:main',
+            'calibrate_intrinsics = scripts.calibrate_intrinsics:main',
+            'calibrate_extrinsics = scripts.calibrate_extrinsics:main',
         ],
     },
 )
