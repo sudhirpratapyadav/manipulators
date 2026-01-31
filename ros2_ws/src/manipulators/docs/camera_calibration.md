@@ -357,3 +357,9 @@ The `object_detection_node` loads this file and uses it to:
 **Detection positions are rotated**
 - RPY angles incorrect
 - Check which direction the chessboard X-axis points
+
+
+
+```
+ros2 launch realsense2_camera rs_launch.py align_depth.enable:=true rgb_camera.color_profile:=640x480x30 depth_module.depth_profile:=640x480x30 
+```

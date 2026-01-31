@@ -22,6 +22,7 @@ from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64
 from std_srvs.srv import Trigger
 from ament_index_python.packages import get_package_share_directory
+from rcl_interfaces.msg import ParameterDescriptor
 
 from .hardware import KinovaHardware
 from .robot_model import RobotModel
@@ -40,6 +41,10 @@ class ControlNode(Node):
         self.declare_parameter('urdf_file', 'assets/robots/kinova/urdf/gen3_2f85.urdf')
         self.declare_parameter('ee_frame', 'gen3_end_effector_link')
         self.declare_parameter('home_position_deg', [0.0, 344.0, 180.0, 214.0, 0.0, 315.0, 90.0])
+        self.declare_parameter(
+            'initial_pose_deg',
+            descriptor=ParameterDescriptor(dynamic_typing=True),
+        )
         self.declare_parameter('control_rate_hz', 400.0)
         self.declare_parameter('kp_task', [150.0, 150.0, 150.0, 80.0, 80.0, 80.0])
         self.declare_parameter('kp_joint', [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -54,6 +59,11 @@ class ControlNode(Node):
         self.password = self.get_parameter('password').value
         self.ee_frame = self.get_parameter('ee_frame').value
         self.home_deg = np.array(self.get_parameter('home_position_deg').value)
+        initial = self.get_parameter('initial_pose_deg').value
+        if initial is not None and len(initial) == 7:
+            self.initial_pose_deg = np.array(initial)
+        else:
+            self.initial_pose_deg = self.home_deg
         self.rate_hz = self.get_parameter('control_rate_hz').value
         self.kp_task = np.array(self.get_parameter('kp_task').value)
         self.kp_joint = np.array(self.get_parameter('kp_joint').value)
@@ -118,15 +128,15 @@ class ControlNode(Node):
             current_angles = self.hw.base.GetMeasuredJointAngles()
             angles_list = [j.value for j in current_angles.joint_angles]
             self.get_logger().info(f"Current joint angles (deg): {angles_list}")
-            self.get_logger().info(f"Target home position (deg): {list(self.home_deg)}")
+            self.get_logger().info(f"Target initial position (deg): {list(self.initial_pose_deg)}")
         except Exception as e:
             self.get_logger().warning(f"Could not read pre-homing state: {e}")
 
-        # Home (high-level mode)
-        self.get_logger().info("Moving to home position ...")
-        if not self.hw.go_to_joints(self.home_deg):
-            raise RuntimeError("Homing failed")
-        self.get_logger().info("Home reached.")
+        # Move to initial pose (high-level mode)
+        self.get_logger().info("Moving to initial position ...")
+        if not self.hw.go_to_joints(self.initial_pose_deg):
+            raise RuntimeError("Moving to initial pose failed")
+        self.get_logger().info("Initial position reached.")
 
         # Build robot model
         self.get_logger().info("Loading robot model ...")

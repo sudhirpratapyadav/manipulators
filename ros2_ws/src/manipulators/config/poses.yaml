@@ -1,0 +1,20 @@
+# Named joint poses (radians, Kinova 0-2pi convention)
+# 7 values: gen3_joint_1 through gen3_joint_7
+
+home:
+  - 6.0669   # 347.6 deg
+  - 0.9930   # 56.9 deg
+  - 3.4628   # 198.4 deg
+  - 4.8488   # 277.8 deg
+  - 5.9010   # 338.1 deg
+  - 5.4994   # 315.1 deg
+  - 1.9145   # 109.7 deg
+
+calib_pose:
+  - 1.186
+  - 0.648
+  - 3.965
+  - 5.011
+  - 5.875
+  - 4.8425
+  - 3.78

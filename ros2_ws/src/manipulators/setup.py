@@ -39,6 +39,7 @@ setup(
             'capture_images = scripts.capture_images:main',
             'calibrate_intrinsics = scripts.calibrate_intrinsics:main',
             'calibrate_extrinsics = scripts.calibrate_extrinsics:main',
+            'extrinsic_calibration_node = src.extrinsic_calibration_node:main',
         ],
     },
 )

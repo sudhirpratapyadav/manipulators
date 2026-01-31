@@ -11,7 +11,8 @@
       "Bash(sudo curl:*)",
       "Bash(sudo udevadm control:*)",
       "Bash(sudo udevadm trigger:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(ros2 pkg executables:*)"
     ]
   }
 }
