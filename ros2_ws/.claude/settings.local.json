@@ -5,7 +5,13 @@
       "Bash(source:*)",
       "Bash(source /opt/ros/*/setup.bash)",
       "Bash(colcon build:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(sudo apt-get update:*)",
+      "Bash(sudo apt-get install:*)",
+      "Bash(sudo curl:*)",
+      "Bash(sudo udevadm control:*)",
+      "Bash(sudo udevadm trigger:*)",
+      "Bash(chmod:*)"
     ]
   }
 }

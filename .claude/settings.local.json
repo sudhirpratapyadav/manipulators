@@ -12,7 +12,18 @@
       "WebFetch(domain:github.com)",
       "WebSearch",
       "WebFetch(domain:schulich.libguides.com)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(pip show:*)",
+      "Bash(pip3 show:*)",
+      "Bash(dpkg:*)",
+      "Bash(sudo apt remove:*)",
+      "Bash(pip install:*)",
+      "Bash(sudo apt install:*)",
+      "Bash(source:*)",
+      "Bash(apt-cache search:*)",
+      "Bash(apt-cache:*)",
+      "Bash(sudo apt update:*)",
+      "Bash(pip uninstall:*)"
     ],
     "deny": [],
     "ask": []

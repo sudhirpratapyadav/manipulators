@@ -1,4 +1,5 @@
 {
+  // NOTE: RealSense camera requires udev rules on HOST machine. See README.md for setup.
   "name": "ROS 2 Development Container",
   "privileged": true,
   "remoteUser": "robot",
@@ -30,9 +31,12 @@
   "runArgs": [
     "--net=host",
     "-e",
-    "DISPLAY=${env:DISPLAY}"
-    // "-p",
-    // "4000:4000/udp",
+    "DISPLAY=${env:DISPLAY}",
+    "--device=/dev/bus/usb:/dev/bus/usb"
+  ],
+  "mounts": [
+    "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached",
+    "source=/dev,target=/dev,type=bind"
   ],
   // "forwardPorts": [4000],
   // "mounts": [

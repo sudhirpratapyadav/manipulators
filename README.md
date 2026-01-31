@@ -71,11 +71,34 @@ See [ros2_ws/src/manipulators/README.md](ros2_ws/src/manipulators/README.md) for
 - Kinova Gen3 7-DOF arm
 - Intel RealSense camera (D435/D455)
 
+### RealSense Camera Setup (Host Machine)
+
+Before using the RealSense camera in the dev container, install udev rules on the **host machine**:
+
+```bash
+# Option 1: Run the setup script (on HOST, not in container)
+./.devcontainer/setup_host.sh
+
+# Option 2: Manual setup
+sudo curl -sSL https://raw.githubusercontent.com/IntelRealSense/librealsense/master/config/99-realsense-libusb.rules -o /etc/udev/rules.d/99-realsense-libusb.rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+Then unplug and replug the RealSense camera. Verify with:
+
+```bash
+realsense-viewer
+```
+
 ### Additional Dependencies (if running outside dev container)
 
 ```bash
 # xterm (required for launch files)
 sudo apt install xterm
+
+# RealSense camera driver
+sudo apt install ros-humble-realsense2-camera
 
 # Pinocchio (robotics kinematics/dynamics library)
 pip install pin
@@ -169,7 +192,23 @@ ros2 launch manipulators diff_ik.launch.py robot_ip:=192.168.1.10
 ros2 run manipulators keyboard_teleop
 ```
 
-### With object detection
+### Test object detection (no robot)
+
+```bash
+# Terminal 1: Start RealSense camera
+ros2 launch realsense2_camera rs_launch.py align_depth.enable:=true
+
+# Terminal 2: Launch detection test
+ros2 launch manipulators test_detection.launch.py
+
+# Visualize detections
+ros2 run rqt_image_view rqt_image_view /detection_image
+
+# Check detected positions
+ros2 topic echo /detected_object_point
+```
+
+### With object detection (full system)
 
 ```bash
 # Terminal 1: Start RealSense camera
@@ -233,6 +272,12 @@ echo 'source ~/manipulators/ros2_ws/install/setup.bash' >> ~/.bashrc
 | [Package README](ros2_ws/src/manipulators/README.md) | Full package documentation |
 | [Diagrams](ros2_ws/src/manipulators/docs/diagrams.md) | Architecture and sequence diagrams |
 | [Camera Calibration](ros2_ws/src/manipulators/docs/camera_calibration.md) | Calibration theory and guide |
+
+### Claude
+```
+curl -fsSL https://claude.ai/install.sh | bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc 
+```
 
 ## License
 

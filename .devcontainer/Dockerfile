@@ -46,24 +46,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-humble-tf2-geometry-msgs \
     ros-humble-rqt \
     ros-humble-rqt-graph \
+    ros-humble-rqt-image-view \
 # openmanipulator dependencies
-    ros-humble-ros2-control \
-    ros-humble-moveit* \
-    ros-humble-gazebo-ros2-control \
-    ros-humble-ros2-controllers \
-    ros-humble-controller-manager \
-    ros-humble-position-controllers \
-    ros-humble-joint-state-broadcaster \
-    ros-humble-joint-trajectory-controller \
-    ros-humble-gripper-controllers \
-    ros-humble-hardware-interface \
+    # ros-humble-ros2-control \
+    # ros-humble-moveit* \
+    # ros-humble-gazebo-ros2-control \
+    # ros-humble-ros2-controllers \
+    # ros-humble-controller-manager \
+    # ros-humble-position-controllers \
+    # ros-humble-joint-state-broadcaster \
+    # ros-humble-joint-trajectory-controller \
+    # ros-humble-gripper-controllers \
+    # ros-humble-hardware-interface \
+# camera
+    ros-humble-realsense2-camera \
 # clean up
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies for the project
 RUN pip3 install --no-cache-dir \
-    numpy \
+    "numpy<2" \
     typing_extensions \
     pin
 
