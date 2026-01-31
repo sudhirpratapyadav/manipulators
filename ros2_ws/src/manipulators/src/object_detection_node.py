@@ -26,6 +26,7 @@ class ObjectDetectionNode(Node):
 
         # -- Parameters --
         self.declare_parameter("camera_calibration_file", "")
+        self.declare_parameter("detector_config_file", "")
         self.declare_parameter("detector_type", "color")
         # Color detector params (passed through to detector)
         self.declare_parameter("hsv_low", [0, 120, 70])
@@ -70,6 +71,12 @@ class ObjectDetectionNode(Node):
             "min_area": self.get_parameter("min_area").value,
             "label": self.get_parameter("label").value,
         }
+
+        # Override detector params from tuning YAML if provided
+        det_config = self.get_parameter("detector_config_file").value
+        if det_config:
+            detector_kwargs = self._load_detector_config(det_config, detector_kwargs)
+
         self.detector = create_detector(detector_type, **detector_kwargs)
         self.get_logger().info(f"Detector: {detector_type}")
 
@@ -96,6 +103,10 @@ class ObjectDetectionNode(Node):
         self.create_subscription(Image, color_topic, self._on_color, 1)
         self.create_subscription(Image, depth_topic, self._on_depth, 1)
         self.create_subscription(CameraInfo, info_topic, self._on_camera_info, 1)
+
+        # -- Visualization window --
+        self._win = "Object Detection"
+        cv2.namedWindow(self._win, cv2.WINDOW_AUTOSIZE)
 
         # -- Timer for detection loop --
         rate = self.get_parameter("publish_rate").value
@@ -127,6 +138,20 @@ class ObjectDetectionNode(Node):
         except Exception as e:
             self.get_logger().error(f"Failed to load extrinsics: {e}")
 
+    def _load_detector_config(self, filepath: str, defaults: dict) -> dict:
+        """Load detector params from tuning YAML, merging with defaults."""
+        try:
+            with open(filepath, "r") as f:
+                data = yaml.safe_load(f) or {}
+            for key in ("hsv_low", "hsv_high", "bgr_low", "bgr_high",
+                        "crop", "min_area", "label"):
+                if key in data:
+                    defaults[key] = data[key]
+            self.get_logger().info(f"Loaded detector config from {filepath}")
+        except Exception as e:
+            self.get_logger().warn(f"Failed to load detector config: {e}")
+        return defaults
+
     # ------------------------------------------------------------------
     # Callbacks
     # ------------------------------------------------------------------
@@ -157,66 +182,92 @@ class ObjectDetectionNode(Node):
         color = self._latest_color
         depth = self._latest_depth
 
+        # Prepare visualization images
+        vis_color = color.copy()
+        # Colorize depth for display (uint16 mm -> 8-bit colormap)
+        depth_clipped = np.clip(
+            depth, self.depth_range[0] * 1000, self.depth_range[1] * 1000
+        )
+        depth_norm = cv2.normalize(depth_clipped, None, 0, 255, cv2.NORM_MINMAX)
+        depth_u8 = depth_norm.astype(np.uint8)
+        vis_depth = cv2.applyColorMap(depth_u8, cv2.COLORMAP_TURBO)
+
         # Run detector
         detections = self.detector.detect(color)
 
-        if not detections:
-            return
+        pt_robot = None
+        if detections:
+            det = detections[0]
+            cx, cy = det.center_px
 
-        # Take the top detection
-        det = detections[0]
-        cx, cy = det.center_px
+            # Bounding box from contour
+            if det.contour is not None:
+                bx, by, bw, bh = cv2.boundingRect(det.contour)
+                cv2.rectangle(vis_color, (bx, by), (bx + bw, by + bh), (0, 255, 0), 2)
+                cv2.rectangle(vis_depth, (bx, by), (bx + bw, by + bh), (0, 255, 0), 2)
 
-        # Get depth at detection center (median over patch)
-        r = self.depth_patch_radius
-        h, w = depth.shape[:2]
-        y1 = max(0, cy - r)
-        y2 = min(h, cy + r + 1)
-        x1 = max(0, cx - r)
-        x2 = min(w, cx + r + 1)
-        patch = depth[y1:y2, x1:x2].astype(float)
+            # Center dot on both
+            cv2.circle(vis_color, (cx, cy), 5, (0, 255, 255), -1)
+            cv2.circle(vis_depth, (cx, cy), 5, (0, 255, 255), -1)
 
-        # depth is in mm (uint16) from realsense driver
-        depth_m = np.median(patch) * 0.001
-        if depth_m < self.depth_range[0] or depth_m > self.depth_range[1]:
-            return
+            # Get depth at detection center (median over patch)
+            r = self.depth_patch_radius
+            h, w = depth.shape[:2]
+            y1 = max(0, cy - r)
+            y2 = min(h, cy + r + 1)
+            x1 = max(0, cx - r)
+            x2 = min(w, cx + r + 1)
+            patch = depth[y1:y2, x1:x2].astype(float)
 
-        # Back-project to 3D in camera frame
-        fx, fy = self.cam_mtx[0, 0], self.cam_mtx[1, 1]
-        ppx, ppy = self.cam_mtx[0, 2], self.cam_mtx[1, 2]
+            # depth is in mm (uint16) from realsense driver
+            depth_m = np.median(patch) * 0.001
 
-        x_cam = (cx - ppx) * depth_m / fx
-        y_cam = (cy - ppy) * depth_m / fy
-        z_cam = depth_m
+            if self.depth_range[0] <= depth_m <= self.depth_range[1]:
+                # Back-project to 3D in camera frame
+                fx, fy = self.cam_mtx[0, 0], self.cam_mtx[1, 1]
+                ppx, ppy = self.cam_mtx[0, 2], self.cam_mtx[1, 2]
 
-        # Transform to robot frame
-        pt_cam = np.array([x_cam, y_cam, z_cam, 1.0])
-        pt_robot = self.T_robot_camera @ pt_cam
+                x_cam = (cx - ppx) * depth_m / fx
+                y_cam = (cy - ppy) * depth_m / fy
+                z_cam = depth_m
 
-        # Publish
-        msg = PointStamped()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = "world"
-        msg.point.x = float(pt_robot[0])
-        msg.point.y = float(pt_robot[1])
-        msg.point.z = float(pt_robot[2])
-        self.object_pose_pub.publish(msg)
+                # Transform to robot frame
+                pt_cam = np.array([x_cam, y_cam, z_cam, 1.0])
+                pt_robot = self.T_robot_camera @ pt_cam
 
-        # Publish annotated image
-        annotated = color.copy()
-        cv2.circle(annotated, (cx, cy), 7, (0, 255, 255), -1)
-        cv2.putText(
-            annotated,
-            f"{det.label} ({pt_robot[0]:.3f}, {pt_robot[1]:.3f}, {pt_robot[2]:.3f})",
-            (cx + 10, cy),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (0, 255, 0),
-            1,
-        )
+                # Publish 3D point
+                msg = PointStamped()
+                msg.header.stamp = self.get_clock().now().to_msg()
+                msg.header.frame_id = "world"
+                msg.point.x = float(pt_robot[0])
+                msg.point.y = float(pt_robot[1])
+                msg.point.z = float(pt_robot[2])
+                self.object_pose_pub.publish(msg)
+
+            # Label text
+            if pt_robot is not None:
+                label = (f"{det.label} ({pt_robot[0]:.3f}, "
+                         f"{pt_robot[1]:.3f}, {pt_robot[2]:.3f})")
+            else:
+                label = f"{det.label} (depth out of range)"
+            cv2.putText(vis_color, label, (cx + 10, cy),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+            cv2.putText(vis_depth, label, (cx + 10, cy),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+
+        # Publish annotated color image
         self.annotated_image_pub.publish(
-            self.bridge.cv2_to_imgmsg(annotated, "bgr8")
+            self.bridge.cv2_to_imgmsg(vis_color, "bgr8")
         )
+
+        # Show side-by-side visualization
+        cv2.putText(vis_color, "Color", (10, 25),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.putText(vis_depth, "Depth", (10, 25),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        canvas = np.hstack([vis_color, vis_depth])
+        cv2.imshow(self._win, canvas)
+        cv2.waitKey(1)
 
     # ------------------------------------------------------------------
 

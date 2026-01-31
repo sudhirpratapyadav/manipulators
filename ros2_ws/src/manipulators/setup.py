@@ -40,6 +40,8 @@ setup(
             'calibrate_intrinsics = scripts.calibrate_intrinsics:main',
             'calibrate_extrinsics = scripts.calibrate_extrinsics:main',
             'extrinsic_calibration_node = src.extrinsic_calibration_node:main',
+            'test_calibration_node = src.test_calibration_node:main',
+            'detector_tuner_node = src.detector_tuner_node:main',
         ],
     },
 )
