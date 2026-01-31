@@ -41,10 +41,7 @@ class ControlNode(Node):
         self.declare_parameter('urdf_file', 'assets/robots/kinova/urdf/gen3_2f85.urdf')
         self.declare_parameter('ee_frame', 'gen3_end_effector_link')
         self.declare_parameter('home_position_deg', [0.0, 344.0, 180.0, 214.0, 0.0, 315.0, 90.0])
-        self.declare_parameter(
-            'initial_pose_deg',
-            descriptor=ParameterDescriptor(dynamic_typing=True),
-        )
+        self.declare_parameter('initial_pose', 'home')
         self.declare_parameter('control_rate_hz', 400.0)
         self.declare_parameter('kp_task', [150.0, 150.0, 150.0, 80.0, 80.0, 80.0])
         self.declare_parameter('kp_joint', [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -59,11 +56,9 @@ class ControlNode(Node):
         self.password = self.get_parameter('password').value
         self.ee_frame = self.get_parameter('ee_frame').value
         self.home_deg = np.array(self.get_parameter('home_position_deg').value)
-        initial = self.get_parameter('initial_pose_deg').value
-        if initial is not None and len(initial) == 7:
-            self.initial_pose_deg = np.array(initial)
-        else:
-            self.initial_pose_deg = self.home_deg
+        self.initial_pose_deg = self._resolve_pose(
+            self.get_parameter('initial_pose').value
+        )
         self.rate_hz = self.get_parameter('control_rate_hz').value
         self.kp_task = np.array(self.get_parameter('kp_task').value)
         self.kp_joint = np.array(self.get_parameter('kp_joint').value)
@@ -104,6 +99,32 @@ class ControlNode(Node):
         self.controller = None
 
         self._joint_names = [f"gen3_joint_{i}" for i in range(1, 8)]
+
+    # ------------------------------------------------------------------
+    # Pose lookup
+    # ------------------------------------------------------------------
+
+    _DEFAULT_POSE_DEG = [0.0, 344.0, 180.0, 214.0, 0.0, 315.0, 90.0]
+
+    def _resolve_pose(self, name: str) -> np.ndarray:
+        """Look up a named pose parameter, fall back to home, then default."""
+        if name == 'home':
+            return self.home_deg
+
+        param_name = f'{name}_deg'
+        try:
+            self.declare_parameter(param_name, descriptor=ParameterDescriptor(dynamic_typing=True))
+            val = self.get_parameter(param_name).value
+            if val is not None and len(val) == 7:
+                self.get_logger().info(f"Using pose '{name}': {val}")
+                return np.array(val, dtype=float)
+        except Exception:
+            pass
+
+        self.get_logger().warn(
+            f"Pose '{name}' (param '{param_name}') not found, falling back to home"
+        )
+        return self.home_deg
 
     # ------------------------------------------------------------------
     # Startup / shutdown sequences

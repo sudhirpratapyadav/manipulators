@@ -10,7 +10,7 @@ control_node:
     ee_frame: "gen3_end_effector_link"
 
     # Home position (degrees) - Kinova 0-360 convention
-    home_position_deg: [347.6, 56.9, 198.4, 277.8, 338.1, 315.1, 109.7]
+    home_position_deg: [90.0, 30.0, 0.0, 90.0, 0.0, 60.0, -90.0]
 
     # Control loop
     control_rate_hz: 400.0
@@ -28,6 +28,10 @@ control_node:
     # Safety limits
     max_joint_velocity: 1.5       # rad/s clamp on diff-IK output
     max_torque: [30.0, 30.0, 30.0, 30.0, 7.0, 7.0, 7.0]  # Nm per joint
+
+    # Named joint poses (degrees, Kinova 0-360 convention)
+    # Use initial_pose param to select which pose to go to on startup
+    calib_pose_deg: [90.0, 30.0, 0.0, 90.0, 0.0, 60.0, -90.0]
 
 keyboard_teleop:
   ros__parameters:

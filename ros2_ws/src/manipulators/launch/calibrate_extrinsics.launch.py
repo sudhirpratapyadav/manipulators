@@ -27,9 +27,6 @@ def generate_launch_description():
     kinova_config = os.path.join(pkg_share, "config", "kinova_gen3.yaml")
     camera_config = os.path.join(pkg_share, "config", "camera.yaml")
 
-    # calib_pose from poses.yaml converted to Kinova degrees (0-360)
-    calib_pose_deg = [67.94, 37.13, 227.14, 287.06, 336.63, 277.43, 216.55]
-
     # ── Launch arguments ─────────────────────────────────────────────
     robot_ip_arg = DeclareLaunchArgument(
         "robot_ip",
@@ -47,7 +44,7 @@ def generate_launch_description():
             kinova_config,
             {
                 "robot_ip": LaunchConfiguration("robot_ip"),
-                "initial_pose_deg": calib_pose_deg,
+                "initial_pose": "calib_pose",
             },
         ],
     )
@@ -85,7 +82,7 @@ def generate_launch_description():
             {
                 "camera_yaml": camera_config,
                 "board_size": [5, 3],
-                "square_size_mm": 45.0,
+                "square_size_mm": 42.1,
                 "image_topic": "/camera/camera/color/image_raw",
                 "default_xyz": [0.0, 0.0, 0.0],
                 "default_rpy": [0.0, 180.0, 0.0],

@@ -8,6 +8,8 @@ at the chessboard origin, robot base, and robot end-effector.
 Press SPACE to save the computed extrinsics.  Press ESC to quit.
 """
 
+import tkinter as tk
+
 import cv2
 import numpy as np
 import yaml
@@ -51,7 +53,7 @@ class ExtrinsicCalibrationNode(Node):
         # -- Parameters ------------------------------------------------
         self.declare_parameter("camera_yaml", "")
         self.declare_parameter("board_size", [5, 3])
-        self.declare_parameter("square_size_mm", 45.0)
+        self.declare_parameter("square_size_mm", 42.1)
         self.declare_parameter("image_topic", "/camera/camera/color/image_raw")
         self.declare_parameter("default_xyz", [0.0, 0.0, 0.0])
         self.declare_parameter("default_rpy", [0.0, 0.0, 0.0])
@@ -109,14 +111,29 @@ class ExtrinsicCalibrationNode(Node):
 
         # -- GUI -------------------------------------------------------
         cv2.namedWindow(_WIN)
-        # Position trackbars: 0–1000, centre 500 → 0.0 m
-        cv2.createTrackbar("X (mm)", _WIN, 500 + int(default_xyz[0] * 1000), 1000, lambda _: None)
-        cv2.createTrackbar("Y (mm)", _WIN, 500 + int(default_xyz[1] * 1000), 1000, lambda _: None)
-        cv2.createTrackbar("Z (mm)", _WIN, 500 + int(default_xyz[2] * 1000), 1000, lambda _: None)
-        # Orientation trackbars: 0–360 degrees
+        # Orientation trackbars (degrees)
         cv2.createTrackbar("Roll  (deg)", _WIN, int(default_rpy[0]) % 361, 360, lambda _: None)
         cv2.createTrackbar("Pitch (deg)", _WIN, int(default_rpy[1]) % 361, 360, lambda _: None)
         cv2.createTrackbar("Yaw   (deg)", _WIN, int(default_rpy[2]) % 361, 360, lambda _: None)
+
+        # Tkinter panel for XYZ text entry
+        self._tk_root = tk.Tk()
+        self._tk_root.title("Board → Robot Transform")
+        self._tk_root.attributes("-topmost", True)
+        self._xyz_vars = []
+        for i, (label, val) in enumerate([
+            ("X (m)", default_xyz[0]),
+            ("Y (m)", default_xyz[1]),
+            ("Z (m)", default_xyz[2]),
+        ]):
+            tk.Label(self._tk_root, text=label, font=("monospace", 12)).grid(
+                row=i, column=0, padx=5, pady=3, sticky="e"
+            )
+            var = tk.StringVar(value=f"{val:.4f}")
+            tk.Entry(
+                self._tk_root, textvariable=var, width=12, font=("monospace", 12)
+            ).grid(row=i, column=1, padx=5, pady=3)
+            self._xyz_vars.append(var)
 
     # ── Callbacks ─────────────────────────────────────────────────────
 
@@ -137,13 +154,16 @@ class ExtrinsicCalibrationNode(Node):
         ])
         self._ee_rot = quat_to_matrix(quat_xyzw)
 
-    # ── Trackbar helpers ─────────────────────────────────────────────
+    # ── Input helpers ────────────────────────────────────────────────
 
-    def _read_trackbars(self):
-        """Return (xyz_m, rpy_deg) from trackbar positions."""
-        x = (cv2.getTrackbarPos("X (mm)", _WIN) - 500) / 1000.0
-        y = (cv2.getTrackbarPos("Y (mm)", _WIN) - 500) / 1000.0
-        z = (cv2.getTrackbarPos("Z (mm)", _WIN) - 500) / 1000.0
+    def _read_inputs(self):
+        """Return (xyz_m, rpy_deg) from Tkinter entries + trackbars."""
+        try:
+            x = float(self._xyz_vars[0].get())
+            y = float(self._xyz_vars[1].get())
+            z = float(self._xyz_vars[2].get())
+        except ValueError:
+            x, y, z = 0.0, 0.0, 0.0
         roll = cv2.getTrackbarPos("Roll  (deg)", _WIN)
         pitch = cv2.getTrackbarPos("Pitch (deg)", _WIN)
         yaw = cv2.getTrackbarPos("Yaw   (deg)", _WIN)
@@ -183,7 +203,12 @@ class ExtrinsicCalibrationNode(Node):
 
             frame = self._latest_frame.copy()
 
-            xyz, rpy_deg = self._read_trackbars()
+            try:
+                self._tk_root.update()
+            except tk.TclError:
+                break  # Tkinter window closed
+
+            xyz, rpy_deg = self._read_inputs()
             T_board_robot = self._build_T_board_robot(xyz, rpy_deg)
 
             # Resolve T_cam_board: live detection, locked, or cached fallback
@@ -303,6 +328,10 @@ class ExtrinsicCalibrationNode(Node):
                 break
 
         cv2.destroyAllWindows()
+        try:
+            self._tk_root.destroy()
+        except tk.TclError:
+            pass
         if saved:
             self.get_logger().info("Calibration saved. Exiting.")
         else:

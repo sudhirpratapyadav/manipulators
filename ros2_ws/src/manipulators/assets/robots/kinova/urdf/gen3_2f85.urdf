@@ -362,13 +362,22 @@
     <axis xyz="0 0 1"/>
     <limit effort="9" velocity="1.2218"/>
   </joint>
-  <link name="gen3_end_effector_link"/>
-  <joint name="gen3_end_effector" type="fixed">
+  <link name="gen3_end_link"/>
+  <joint name="gen3_end_joint" type="fixed">
     <origin rpy="3.14159265358979 1.09937075168372E-32 0" xyz="0 0 -0.0615250000000001"/>
     <parent link="gen3_bracelet_link"/>
+    <child link="gen3_end_link"/>
+    <axis xyz="0 0 0"/>
+  </joint>
+
+  <link name="gen3_end_effector_link"/>
+  <joint name="gen3_end_effector_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.15"/>
+    <parent link="gen3_end_link"/>
     <child link="gen3_end_effector_link"/>
     <axis xyz="0 0 0"/>
   </joint>
+
   <link name="gen3_robotiq_85_base_link">
     <visual>
       <geometry>
@@ -559,7 +568,7 @@
     </inertial>
   </link>
   <joint name="gen3_robotiq_85_base_joint" type="fixed">
-    <parent link="gen3_end_effector_link"/>
+    <parent link="gen3_end_link"/>
     <child link="gen3_robotiq_85_base_link"/>
     <origin rpy="0 0 0" xyz="0 0 0"/>
   </joint>
