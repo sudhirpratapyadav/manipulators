@@ -4,7 +4,8 @@
       "Bash(ls:*)",
       "Bash(source:*)",
       "Bash(source /opt/ros/*/setup.bash)",
-      "Bash(colcon build:*)"
+      "Bash(colcon build:*)",
+      "Bash(pip install:*)"
     ]
   }
 }

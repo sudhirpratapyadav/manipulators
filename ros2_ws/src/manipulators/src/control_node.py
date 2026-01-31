@@ -7,10 +7,15 @@ Shutdown: stop loop → position mode → high-level mode → home → disconnec
 
 import os
 import time
+import logging
 import threading
 import numpy as np
 
 import rclpy
+
+# Enable debug logging for hardware module to see action diagnostics
+logging.getLogger('manipulators.hardware').setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.INFO, format='[%(name)s] %(levelname)s: %(message)s')
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import JointState
@@ -106,6 +111,17 @@ class ControlNode(Node):
         if not self.hw.wait_until_ready():
             raise RuntimeError("Arm not ready after clearing faults")
 
+        # Log current state before homing
+        try:
+            arm_state = self.hw.base.GetArmState()
+            self.get_logger().info(f"Arm state: {arm_state}")
+            current_angles = self.hw.base.GetMeasuredJointAngles()
+            angles_list = [j.value for j in current_angles.joint_angles]
+            self.get_logger().info(f"Current joint angles (deg): {angles_list}")
+            self.get_logger().info(f"Target home position (deg): {list(self.home_deg)}")
+        except Exception as e:
+            self.get_logger().warning(f"Could not read pre-homing state: {e}")
+
         # Home (high-level mode)
         self.get_logger().info("Moving to home position ...")
         if not self.hw.go_to_joints(self.home_deg):
@@ -120,9 +136,12 @@ class ControlNode(Node):
         state = self.hw.read_state()
         q = kinova_degrees_to_radians(state.positions_deg)
         ee_pos, ee_rot = self.model.fk(q)
+        ee_quat = matrix_to_quat(ee_rot)
+        quat_norm = np.linalg.norm(ee_quat)
+        self.get_logger().info(f"Home EE pose: pos={ee_pos.round(4)}, quat={ee_quat.round(4)}, quat_norm={quat_norm:.4f}")
         with self._lock:
             self._target_pos = ee_pos.copy()
-            self._target_quat = matrix_to_quat(ee_rot)
+            self._target_quat = ee_quat
 
         # Create controller
         self.controller = DiffIKController(

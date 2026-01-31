@@ -1,8 +1,8 @@
 """
 Pinocchio robot model wrapper.
 
-Loads URDF, builds a reduced model (arm joints only, gripper locked),
-and provides gravity, Jacobian, and FK computations.
+Loads full URDF but uses only 7 arm joints for control.
+Gripper joints are kept at neutral position.
 """
 
 import numpy as np
@@ -13,26 +13,11 @@ ARM_JOINT_NAMES = [f"gen3_joint_{i}" for i in range(1, 8)]
 
 
 class RobotModel:
-    """Pinocchio model for the Kinova Gen3 arm (7-DOF, gripper joints locked)."""
+    """Pinocchio model for the Kinova Gen3 arm (7-DOF control, full URDF)."""
 
     def __init__(self, urdf_path: str, ee_frame: str = "gen3_end_effector_link"):
-        # Load full model from URDF
-        full_model = pin.buildModelFromUrdf(urdf_path)
-
-        # Identify arm joint IDs
-        arm_ids = set()
-        for name in ARM_JOINT_NAMES:
-            jid = full_model.getJointId(name)
-            if jid >= full_model.njoints:
-                raise ValueError(f"Joint '{name}' not found in URDF")
-            arm_ids.add(jid)
-
-        # Lock every non-arm joint (gripper joints) at neutral
-        joints_to_lock = [
-            i for i in range(1, full_model.njoints) if i not in arm_ids
-        ]
-        q_ref = pin.neutral(full_model)
-        self.model = pin.buildReducedModel(full_model, joints_to_lock, q_ref)
+        # Load full URDF (includes gripper joints)
+        self.model = pin.buildModelFromUrdf(urdf_path)
         self.data = self.model.createData()
 
         # Cache EE frame ID
@@ -40,32 +25,52 @@ class RobotModel:
         if self.ee_frame_id >= self.model.nframes:
             raise ValueError(f"Frame '{ee_frame}' not found in model")
 
-        self.nq = self.model.nq  # should be 7
+        # Precompute joint indices for 7 arm joints
+        self._v_idx = []   # Velocity indices (for Jacobian/gravity extraction)
+        self._q_info = []  # (idx_q, nq) pairs for config assignment
+        for name in ARM_JOINT_NAMES:
+            jid = self.model.getJointId(name)
+            if jid == 0:
+                raise ValueError(f"Joint '{name}' not found in URDF")
+            joint = self.model.joints[jid]
+            self._v_idx.append(joint.idx_v)
+            self._q_info.append((joint.idx_q, joint.nq))
+
+        self._v_idx = np.array(self._v_idx, dtype=np.intp)
+
+        # Pre-allocate full config (reused every call)
+        self._q_full = pin.neutral(self.model)
+
+        self.nq = 7
+
+    def _set_q(self, q: np.ndarray):
+        """Set arm joint angles in full config. Handles nq=2 (cos,sin) joints."""
+        for i, (idx_q, nq) in enumerate(self._q_info):
+            if nq == 1:
+                self._q_full[idx_q] = q[i]
+            else:  # nq == 2: unbounded joint stored as (cos, sin)
+                self._q_full[idx_q] = np.cos(q[i])
+                self._q_full[idx_q + 1] = np.sin(q[i])
 
     def gravity(self, q: np.ndarray) -> np.ndarray:
         """Compute generalized gravity torques (7,)."""
-        return pin.computeGeneralizedGravity(self.model, self.data, q)
+        self._set_q(q)
+        pin.computeGeneralizedGravity(self.model, self.data, self._q_full)
+        return self.data.g[self._v_idx]
 
     def jacobian(self, q: np.ndarray) -> np.ndarray:
-        """
-        Compute EE Jacobian (6x7) in LOCAL_WORLD_ALIGNED frame.
-
-        Rows: [linear_x, linear_y, linear_z, angular_x, angular_y, angular_z].
-        """
-        pin.computeJointJacobians(self.model, self.data, q)
-        pin.framesForwardKinematics(self.model, self.data, q)
-        return pin.getFrameJacobian(
+        """Compute EE Jacobian (6x7) in LOCAL_WORLD_ALIGNED frame."""
+        self._set_q(q)
+        pin.computeJointJacobians(self.model, self.data, self._q_full)
+        pin.framesForwardKinematics(self.model, self.data, self._q_full)
+        J_full = pin.getFrameJacobian(
             self.model, self.data, self.ee_frame_id, pin.LOCAL_WORLD_ALIGNED
         )
+        return J_full[:, self._v_idx]
 
     def fk(self, q: np.ndarray):
-        """
-        Forward kinematics for the EE frame.
-
-        Returns:
-            position: (3,) translation
-            rotation: (3,3) rotation matrix
-        """
-        pin.framesForwardKinematics(self.model, self.data, q)
+        """Forward kinematics. Returns (position (3,), rotation (3,3))."""
+        self._set_q(q)
+        pin.framesForwardKinematics(self.model, self.data, self._q_full)
         oMf = self.data.oMf[self.ee_frame_id]
         return oMf.translation.copy(), oMf.rotation.copy()

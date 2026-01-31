@@ -81,14 +81,16 @@ class DiffIKController:
         dq_desired = J.T @ np.linalg.solve(JJT, twist_desired)  # (7,)
 
         # Clamp desired joint velocities
-        dq_scale = np.max(np.abs(dq_desired)) / self.max_dq
-        if dq_scale > 1.0:
-            dq_desired /= dq_scale
+        # dq_scale = np.max(np.abs(dq_desired)) / self.max_dq
+        # if dq_scale > 1.0:
+        #     dq_desired /= dq_scale
 
         # Desired joint position (one-step integration)
         q_desired = q + dq_desired * self.dt
 
         # Joint torques: PD tracking + gravity compensation
+        dq_desired*=0.0
+        # self.kp_joint*=0.0
         tau = (self.kp_joint * (q_desired - q)
                + self.kd_joint * (dq_desired - dq)
                + self.model.gravity(q))

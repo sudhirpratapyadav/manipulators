@@ -14,9 +14,10 @@ RUN groupadd --gid $USER_GID $USERNAME \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME
 RUN apt-get update && apt-get upgrade -y
-RUN apt-get install -y python3-pip \ 
+RUN apt-get install -y python3-pip \
     nano libboost-all-dev tcpreplay \
-    libpcap-dev netcat iproute2
+    libpcap-dev netcat iproute2 \
+    xterm
 ENV SHELL /bin/bash
 
 # Install basic development tools and ROS2 dependencies
@@ -63,7 +64,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python dependencies for the project
 RUN pip3 install --no-cache-dir \
     numpy \
-    typing_extensions
+    typing_extensions \
+    pin
+
+# Install Kinova Kortex API
+RUN pip3 install --no-cache-dir \
+    https://artifactory.kinovaapps.com/artifactory/generic-public/kortex/API/2.6.0/kortex_api-2.6.0.post3-py3-none-any.whl \
+    && pip3 install --no-cache-dir protobuf==3.20.0
 
 # # Install Node.js 20.x and npm
 # RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \

@@ -6,8 +6,11 @@ UDP for real-time torque control and feedback.
 """
 
 import time
+import logging
 import numpy as np
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 from kortex_api.TCPTransport import TCPTransport
 from kortex_api.UDPTransport import UDPTransport
@@ -205,15 +208,23 @@ class KinovaHardware:
     def wait_until_ready(self, timeout: float = 10.0) -> bool:
         """Poll arm state, auto-clearing faults. Returns True if ready."""
         deadline = time.time() + timeout
+        last_state = None
         while time.time() < deadline:
             if self.is_ready():
+                logger.info("Arm is ready")
                 return True
             try:
-                if self.base.GetArmState().active_state == Base_pb2.ARMSTATE_IN_FAULT:
+                arm_state = self.base.GetArmState()
+                if arm_state.active_state != last_state:
+                    logger.info(f"Arm state: {arm_state.active_state} (waiting for ready)")
+                    last_state = arm_state.active_state
+                if arm_state.active_state == Base_pb2.ARMSTATE_IN_FAULT:
+                    logger.warning("Arm in fault state, attempting to clear...")
                     self.clear_faults()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Error checking arm state: {e}")
             time.sleep(0.1)
+        logger.error(f"Arm not ready after {timeout}s timeout. Last state: {last_state}")
         return False
 
     # ------------------------------------------------------------------
@@ -294,22 +305,45 @@ class KinovaHardware:
 
         done = [False]
         success = [False]
+        abort_info = [None]
 
         def _on_action(notif):
+            event_names = {
+                Base_pb2.ACTION_START: "ACTION_START",
+                Base_pb2.ACTION_END: "ACTION_END",
+                Base_pb2.ACTION_ABORT: "ACTION_ABORT",
+                Base_pb2.ACTION_PAUSE: "ACTION_PAUSE",
+            }
+            event_name = event_names.get(notif.action_event, f"UNKNOWN({notif.action_event})")
+            logger.debug(f"Action notification: {event_name}")
+
             if notif.action_event == Base_pb2.ACTION_END:
                 done[0] = True
                 success[0] = True
             elif notif.action_event == Base_pb2.ACTION_ABORT:
+                abort_info[0] = notif
                 done[0] = True
 
         handle = self.base.OnNotificationActionTopic(
             _on_action, Base_pb2.NotificationOptions()
         )
         try:
+            logger.info(f"Executing JointMove to {target_deg} (duration={duration}s)")
             self.base.ExecuteAction(action)
             deadline = time.time() + duration + 10.0
             while not done[0] and time.time() < deadline:
                 time.sleep(0.1)
+
+            if not done[0]:
+                logger.error(f"JointMove timed out after {duration + 10.0}s")
+            elif abort_info[0] is not None:
+                logger.error(f"JointMove aborted. Notification: {abort_info[0]}")
+                # Try to get current arm state for more context
+                try:
+                    arm_state = self.base.GetArmState()
+                    logger.error(f"Arm state after abort: {arm_state}")
+                except Exception as e:
+                    logger.warning(f"Could not get arm state: {e}")
         finally:
             self.base.Unsubscribe(handle)
 

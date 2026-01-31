@@ -2,6 +2,37 @@
 
 Kinova Gen3 7-DOF robot arm control and perception system using ROS2. Features direct torque control via Kortex API, differential IK with Pinocchio, and camera-based object detection with RealSense.
 
+## Setup Docker and Kinova
+```
+sudo nmcli connection add type ethernet con-name kinova-robot ifname eno1 ipv4.method manual ipv4.addresses 192.168.1.100/24
+Connection 'kinova-robot' (ea9ff8ae-ee5e-40b1-8edf-cc9bbb7634d8) successfully added.
+robot@robot-HP-Z2-Tower-G9-Workstation-Desktop-PC:~$ sudo nmcli connection up kinova-robot
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/22)
+```
+
+```
+sudo nano /etc/docker/daemon.json
+```
+
+```
+{
+    "bip": "192.168.100.1/24",
+    "default-address-pools": [
+        {
+            "base": "192.168.2.0/16",
+            "size": 24
+        }
+    ],
+    "runtimes": {
+        "nvidia": {
+            "args": [],
+            "path": "nvidia-container-runtime"
+        }
+    }
+}
+```
+
+
 ## Project Structure
 
 ```
@@ -40,6 +71,16 @@ See [ros2_ws/src/manipulators/README.md](ros2_ws/src/manipulators/README.md) for
 - Kinova Gen3 7-DOF arm
 - Intel RealSense camera (D435/D455)
 
+### Additional Dependencies (if running outside dev container)
+
+```bash
+# xterm (required for launch files)
+sudo apt install xterm
+
+# Pinocchio (robotics kinematics/dynamics library)
+pip install pin
+```
+
 ## Dev Container Setup
 
 This project uses a VS Code dev container with all dependencies pre-installed (ROS2 Humble, Pinocchio, Kortex API, MoveIt, cv_bridge, etc.).
@@ -73,6 +114,38 @@ This project uses a VS Code dev container with all dependencies pre-installed (R
 - [VS Code Dev Containers](https://code.visualstudio.com/docs/devcontainers/containers)
 - [ROS2 Humble Documentation](https://docs.ros.org/en/humble/)
 - [Dev Containers Specification](https://containers.dev/)
+
+## Kinova Kortex API Installation
+
+If the Kortex API is not pre-installed in the container, install it manually:
+
+```bash
+# Download from Kinova Artifactory
+cd /tmp
+curl -L "https://artifactory.kinovaapps.com/artifactory/generic-public/kortex/API/2.6.0/kortex_api-2.6.0.post3-py3-none-any.whl" \
+  -o kortex_api-2.6.0.post3-py3-none-any.whl
+
+# Install
+pip3 install kortex_api-2.6.0.post3-py3-none-any.whl
+```
+
+### Python 3.10+ Compatibility Fix
+
+The Kortex API requires protobuf 3.5.1, which is incompatible with Python 3.10+. Fix by upgrading protobuf:
+
+```bash
+pip3 install --force-reinstall protobuf==3.20.0
+```
+
+### Test Robot Connection
+
+Verify connectivity to the robot:
+
+```bash
+python3 ros2_ws/src/manipulators/scripts/test_robot_connection.py --ip 192.168.1.10
+```
+
+On success, this prints the arm state and joint positions. On failure, it shows troubleshooting steps.
 
 ## Build
 
