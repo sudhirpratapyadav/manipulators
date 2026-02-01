@@ -62,9 +62,9 @@ class PolicyConfig:
     pre_place_position: np.ndarray
     place_position: np.ndarray
 
-    # Heights
+    # Heights / offsets
     pre_grasp_height: float
-    grasp_height: float
+    grasp_offset: np.ndarray   # [x, y, z] offset from object to grasp pose
     lift_height: float
 
     # Orientation
@@ -157,7 +157,7 @@ class PickPlacePolicy(Node):
         self.declare_parameter('pick_place.pre_place_position', [0.4, 0.3, 0.25])
         self.declare_parameter('pick_place.place_position', [0.4, 0.3, 0.05])
         self.declare_parameter('pick_place.pre_grasp_height', 0.10)
-        self.declare_parameter('pick_place.grasp_height', 0.025)
+        self.declare_parameter('pick_place.grasp_offset', [0.0, 0.0, 0.025])
         self.declare_parameter('pick_place.lift_height', 0.15)
         self.declare_parameter('pick_place.grasp_orientation', [0.0, 0.7071, 0.0, 0.7071])
         self.declare_parameter('pick_place.max_linear_velocity', 0.25)
@@ -183,7 +183,9 @@ class PickPlacePolicy(Node):
                 self.get_parameter('pick_place.place_position').value, dtype=np.float64
             ),
             pre_grasp_height=self.get_parameter('pick_place.pre_grasp_height').value,
-            grasp_height=self.get_parameter('pick_place.grasp_height').value,
+            grasp_offset=np.array(
+                self.get_parameter('pick_place.grasp_offset').value, dtype=np.float64
+            ),
             lift_height=self.get_parameter('pick_place.lift_height').value,
             grasp_orientation=np.array(
                 self.get_parameter('pick_place.grasp_orientation').value, dtype=np.float64
@@ -333,10 +335,9 @@ class PickPlacePolicy(Node):
             return self._current_target_pos, cfg.grasp_orientation, 0.0
 
         elif self._state == State.DESCEND:
-            # At object grasp height
+            # At object + grasp offset
             if obj_pos is not None:
-                target = obj_pos.copy()
-                target[2] += cfg.grasp_height
+                target = obj_pos + cfg.grasp_offset
                 return target, cfg.grasp_orientation, 0.0
             return self._current_target_pos, cfg.grasp_orientation, 0.0
 
@@ -438,8 +439,7 @@ class PickPlacePolicy(Node):
         elif self._state == State.DESCEND:
             obj_pos = self._get_object_position()
             if obj_pos is not None:
-                grasp_pos = obj_pos.copy()
-                grasp_pos[2] += cfg.grasp_height
+                grasp_pos = obj_pos + cfg.grasp_offset
                 if self._position_reached(grasp_pos):
                     self._transition_to(State.GRASP)
 

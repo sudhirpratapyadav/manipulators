@@ -5,25 +5,25 @@ pick_place_policy:
       idle_position: [-0.0249, -0.4826, 0.1745]  # x, y, z in robot frame
 
       # Grasp parameters
-      pre_grasp_height: 0.10          # meters above object
-      grasp_height: 0.05             # meters above object (fingertip offset)
+      pre_grasp_height: 0.15          # meters above object
+      grasp_offset: [0.0, 0.0, 0.02]  # [x, y, z] offset from object to grasp pose
       lift_height: 0.2               # meters above object after grasp
 
       # Mid-transport waypoint (pass through during transport)
       mid_transport_position: [-0.0249, -0.4826, 0.1745]  # x, y, z
 
       # Place parameters
-      pre_place_position: [-0.0249, -0.4826, 0.1745]   # above place location
-      place_position: [-0.0249, -0.4826, 0.1745]       # final place location
+      pre_place_position: [-0.0249, -0.4826, 0.17]   # above place location
+      place_position: [-0.0249, -0.4826, 0.06]       # final place location
 
       # Grasp orientation (quaternion xyzw) - top-down
       # This is ~180deg rotation around Y to point gripper down
-      grasp_orientation: [1.0, 0.0, 0.0, -0.0001]
+      grasp_orientation: [1.0, 0.0, 0.0, 0.0]
 
       # Motion parameters
-      max_linear_velocity: 0.15       # m/s - max target movement speed
+      max_linear_velocity: 0.1      # m/s - max target movement speed
       max_angular_velocity: 0.5       # rad/s - max orientation change speed
-      position_threshold: 0.02        # meters - "arrived" distance
+      position_threshold: 0.01        # meters - "arrived" distance
       orientation_threshold: 0.1     # radians - "arrived" orientation error
 
       # Timing

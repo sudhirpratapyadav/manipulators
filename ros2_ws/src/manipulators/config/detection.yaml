@@ -33,3 +33,7 @@ object_detection_node:
     - 2.0
     depth_patch_radius: 3
     publish_rate: 30.0
+    object_offset_robot:
+    - 0.01
+    - 0.02
+    - 0.0

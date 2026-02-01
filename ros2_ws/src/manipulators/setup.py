@@ -42,6 +42,7 @@ setup(
             'extrinsic_calibration_node = src.extrinsic_calibration_node:main',
             'test_calibration_node = src.test_calibration_node:main',
             'detector_tuner_node = src.detector_tuner_node:main',
+            'visualization_node = src.visualization_node:main',
         ],
     },
 )

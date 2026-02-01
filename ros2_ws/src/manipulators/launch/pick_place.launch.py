@@ -5,6 +5,7 @@ Launches:
     - control_node: Low-level torque control (400 Hz)
     - RealSense camera
     - object_detection_node: Object detection and 3D localization
+    - visualization_node: Unified display (RGB+depth, bbox, axes)
     - pick_place_policy: Reactive pick-place state machine
 
 Usage:
@@ -80,7 +81,16 @@ def generate_launch_description():
         ],
     )
 
-    # ── 4. Pick-place policy node (in separate xterm) ───────────────
+    # ── 4. Visualization node ─────────────────────────────────────────
+    vis_node = Node(
+        package='manipulators',
+        executable='visualization_node',
+        name='visualization_node',
+        output='screen',
+        parameters=[{'camera_yaml': camera_config}],
+    )
+
+    # ── 5. Pick-place policy node (in separate xterm) ───────────────
     policy_node = Node(
         package='manipulators',
         executable='pick_place_policy',
@@ -95,5 +105,6 @@ def generate_launch_description():
         control_node,
         realsense_launch,
         detection_node,
+        vis_node,
         policy_node,
     ])
