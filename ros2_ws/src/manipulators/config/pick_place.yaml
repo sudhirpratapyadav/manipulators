@@ -2,19 +2,19 @@ pick_place_policy:
   ros__parameters:
     pick_place:
       # Idle/home position (where robot waits)
-      idle_position: [-0.0249, -0.4826, 0.1745]  # x, y, z in robot frame
+      idle_position: [-0.02, -0.48, 0.17]  # x, y, z in robot frame
 
       # Grasp parameters
-      pre_grasp_height: 0.15          # meters above object
+      pre_grasp_height: 0.08          # meters above object
       grasp_offset: [0.0, 0.0, 0.02]  # [x, y, z] offset from object to grasp pose
-      lift_height: 0.2               # meters above object after grasp
+      lift_height: 0.05               # meters above object after grasp
 
       # Mid-transport waypoint (pass through during transport)
-      mid_transport_position: [-0.0249, -0.4826, 0.1745]  # x, y, z
+      mid_transport_position: [-0.02, -0.48, 0.14]  # x, y, z
 
       # Place parameters
-      pre_place_position: [-0.0249, -0.4826, 0.17]   # above place location
-      place_position: [-0.0249, -0.4826, 0.06]       # final place location
+      pre_place_position: [-0.02, -0.48, 0.14]   # above place location
+      place_position: [-0.02, -0.48, 0.078]       # final place location
 
       # Grasp orientation (quaternion xyzw) - top-down
       # This is ~180deg rotation around Y to point gripper down
@@ -27,7 +27,7 @@ pick_place_policy:
       orientation_threshold: 0.1     # radians - "arrived" orientation error
 
       # Timing
-      grasp_settle_time: 0.8          # seconds to wait for gripper to close
+      grasp_settle_time: 0.5          # seconds to wait for gripper to close
       release_settle_time: 0.5        # seconds to wait for gripper to open
 
       # Detection

@@ -1,0 +1,1 @@
+[control_node-1] [ERROR] [1769939568.213572169] [control_node]: Control loop error: Server error name=ERROR_DEVICE, sub name=WRONG_SERVOING_MODE => Wrong servoing mode, must be low level servoing mode 

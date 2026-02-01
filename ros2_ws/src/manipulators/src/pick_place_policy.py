@@ -112,6 +112,9 @@ class PickPlacePolicy(Node):
         # Grasp position (latched when entering GRASP state)
         self._grasp_pos: Optional[np.ndarray] = None
 
+        # Continuous-run flag (set by /start, cleared by /stop or /abort)
+        self._running = False
+
         # Subscribers
         self._object_sub = self.create_subscription(
             PointStamped,
@@ -140,6 +143,11 @@ class PickPlacePolicy(Node):
             Trigger,
             '/pick_place/abort',
             self._abort_callback
+        )
+        self._stop_srv = self.create_service(
+            Trigger,
+            '/pick_place/stop',
+            self._stop_callback
         )
 
         # Main policy loop timer
@@ -223,31 +231,30 @@ class PickPlacePolicy(Node):
             ])
 
     def _start_callback(self, request, response):
-        """Handle start service request."""
+        """Handle start service request — begins continuous pick-place loop."""
         with self._lock:
-            # Check if we're in IDLE state
             if self._state != State.IDLE:
                 response.success = False
                 response.message = f'Cannot start: currently in {self._state.name} state'
                 return response
 
-            # Check for fresh object detection
             if not self._is_detection_fresh():
                 response.success = False
                 response.message = 'Cannot start: no fresh object detection'
                 return response
 
-            # Start the pick-place cycle
+            self._running = True
             self._transition_to(State.APPROACH)
             response.success = True
-            response.message = 'Pick-place cycle started'
-            self.get_logger().info('Pick-place cycle started')
+            response.message = 'Pick-place continuous loop started'
+            self.get_logger().info('Pick-place continuous loop started')
 
         return response
 
     def _abort_callback(self, request, response):
-        """Handle abort service request."""
+        """Handle abort service request — stops loop and returns to idle."""
         with self._lock:
+            self._running = False
             if self._state in (State.INIT, State.IDLE):
                 response.success = False
                 response.message = 'Nothing to abort'
@@ -260,6 +267,15 @@ class PickPlacePolicy(Node):
             response.message = 'Aborting, returning to idle'
             self.get_logger().warn('Pick-place aborted by user')
 
+        return response
+
+    def _stop_callback(self, request, response):
+        """Handle stop service request — finishes current cycle then stops."""
+        with self._lock:
+            self._running = False
+            response.success = True
+            response.message = 'Will stop after current cycle completes'
+            self.get_logger().info('Stop requested — will finish current cycle then stop')
         return response
 
     def _is_detection_fresh(self) -> bool:
@@ -284,9 +300,9 @@ class PickPlacePolicy(Node):
         # State entry actions
         if new_state == State.GRASP:
             self._gripper_command = 1.0  # Close gripper
-            # Latch the grasp position for lift calculation
-            if self._last_valid_object_pos is not None:
-                self._grasp_pos = self._last_valid_object_pos.copy()
+            # Latch current EE position for lift calculation
+            if self._ee_pos is not None:
+                self._grasp_pos = self._ee_pos.copy()
         elif new_state == State.RELEASE:
             self._gripper_command = 0.0  # Open gripper
         elif new_state == State.IDLE:
@@ -425,8 +441,11 @@ class PickPlacePolicy(Node):
                 self._transition_to(State.IDLE)
 
         elif self._state == State.IDLE:
-            # Transitions handled by service callback
-            pass
+            # Auto-restart after 1s pause if running continuously
+            if self._running and self._time_in_state() >= 1.0:
+                if self._is_detection_fresh():
+                    self.get_logger().info('Auto-starting next pick-place cycle')
+                    self._transition_to(State.APPROACH)
 
         elif self._state == State.APPROACH:
             obj_pos = self._get_object_position()
@@ -477,7 +496,10 @@ class PickPlacePolicy(Node):
         elif self._state == State.RETURN_IDLE:
             if self._position_reached(cfg.idle_position):
                 self._transition_to(State.IDLE)
-                self.get_logger().info('Pick-place cycle complete. Waiting for next trigger.')
+                if self._running:
+                    self.get_logger().info('Pick-place cycle complete. Restarting in 1s...')
+                else:
+                    self.get_logger().info('Pick-place cycle complete.')
 
     def _publish_commands(self):
         """Publish target pose and gripper command."""
@@ -544,7 +566,7 @@ class PickPlacePolicy(Node):
                 print(
                     f"\033[2J\033[H"  # clear screen
                     f"═══ Pick-Place Policy Debug ═══\n"
-                    f"State:    {self._state.name}\n"
+                    f"State:    {self._state.name}  {'[RUNNING]' if self._running else '[STOPPED]'}\n"
                     f"Gripper:  {'CLOSED' if self._gripper_command > 0.5 else 'OPEN'} ({self._gripper_command:.1f})\n"
                     f"\n"
                     f"EE pos:      [{self._ee_pos[0]:.4f}, {self._ee_pos[1]:.4f}, {self._ee_pos[2]:.4f}]\n"
