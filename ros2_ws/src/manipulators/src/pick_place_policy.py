@@ -528,6 +528,40 @@ class PickPlacePolicy(Node):
             # Publish commands
             self._publish_commands()
 
+            # Debug print at ~2 Hz
+            self._debug_counter = getattr(self, '_debug_counter', 0) + 1
+            if self._debug_counter % max(1, int(self._config.policy_rate / 2)) == 0:
+                pos_err_vec = desired_pos - self._ee_pos
+                pos_err_norm = np.linalg.norm(pos_err_vec)
+                quat_err_vec = desired_quat - self._ee_quat
+                quat_err_norm = np.linalg.norm(quat_err_vec)
+                obj_str = (f"[{self._object_pos[0]:.4f}, {self._object_pos[1]:.4f}, {self._object_pos[2]:.4f}]"
+                           if self._object_pos is not None else "None")
+                # Green if under threshold, red if over
+                GRN, RED, RST = '\033[32m', '\033[31m', '\033[0m'
+                pos_color = GRN if pos_err_norm < self._config.position_threshold else RED
+                quat_color = GRN if quat_err_norm < self._config.orientation_threshold else RED
+                print(
+                    f"\033[2J\033[H"  # clear screen
+                    f"═══ Pick-Place Policy Debug ═══\n"
+                    f"State:    {self._state.name}\n"
+                    f"Gripper:  {'CLOSED' if self._gripper_command > 0.5 else 'OPEN'} ({self._gripper_command:.1f})\n"
+                    f"\n"
+                    f"EE pos:      [{self._ee_pos[0]:.4f}, {self._ee_pos[1]:.4f}, {self._ee_pos[2]:.4f}]\n"
+                    f"EE quat:     [{self._ee_quat[0]:.4f}, {self._ee_quat[1]:.4f}, {self._ee_quat[2]:.4f}, {self._ee_quat[3]:.4f}]\n"
+                    f"\n"
+                    f"Desired pos: [{desired_pos[0]:.4f}, {desired_pos[1]:.4f}, {desired_pos[2]:.4f}]  (state goal)\n"
+                    f"Target pos:  [{self._current_target_pos[0]:.4f}, {self._current_target_pos[1]:.4f}, {self._current_target_pos[2]:.4f}]  (vel-limited, sent to robot)\n"
+                    f"Target quat: [{self._current_target_quat[0]:.4f}, {self._current_target_quat[1]:.4f}, {self._current_target_quat[2]:.4f}, {self._current_target_quat[3]:.4f}]\n"
+                    f"\n"
+                    f"Pos error:   [{pos_err_vec[0]:.4f}, {pos_err_vec[1]:.4f}, {pos_err_vec[2]:.4f}]  {pos_color}norm={pos_err_norm:.4f}{RST}  (thresh: {self._config.position_threshold})\n"
+                    f"Quat error:  [{quat_err_vec[0]:.4f}, {quat_err_vec[1]:.4f}, {quat_err_vec[2]:.4f}, {quat_err_vec[3]:.4f}]  {quat_color}norm={quat_err_norm:.4f}{RST}  (thresh: {self._config.orientation_threshold})\n"
+                    f"\n"
+                    f"Object pos:  {obj_str}\n"
+                    f"Detection fresh: {self._is_detection_fresh()}\n",
+                    flush=True,
+                )
+
 
 def main(args=None):
     rclpy.init(args=args)

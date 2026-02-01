@@ -3,6 +3,7 @@ Launch file for pick-and-place system.
 
 Launches:
     - control_node: Low-level torque control (400 Hz)
+    - RealSense camera
     - object_detection_node: Object detection and 3D localization
     - pick_place_policy: Reactive pick-place state machine
 
@@ -20,7 +21,8 @@ To abort:
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -38,10 +40,10 @@ def generate_launch_description():
     robot_ip_arg = DeclareLaunchArgument(
         'robot_ip',
         default_value='192.168.1.10',
-        description='IP address of the Kinova robot'
+        description='IP address of the Kinova robot',
     )
 
-    # Control node
+    # ── 1. Control node ──────────────────────────────────────────────
     control_node = Node(
         package='manipulators',
         executable='control_node',
@@ -49,11 +51,24 @@ def generate_launch_description():
         output='screen',
         parameters=[
             kinova_config,
-            {'robot_ip': LaunchConfiguration('robot_ip')}
+            {'robot_ip': LaunchConfiguration('robot_ip')},
         ],
     )
 
-    # Object detection node
+    # ── 2. RealSense camera ──────────────────────────────────────────
+    realsense_share = get_package_share_directory('realsense2_camera')
+    realsense_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(realsense_share, 'launch', 'rs_launch.py')
+        ),
+        launch_arguments={
+            'align_depth.enable': 'true',
+            'rgb_camera.color_profile': '640x480x30',
+            'depth_module.depth_profile': '640x480x30',
+        }.items(),
+    )
+
+    # ── 3. Object detection node ─────────────────────────────────────
     detection_node = Node(
         package='manipulators',
         executable='object_detection_node',
@@ -61,22 +76,24 @@ def generate_launch_description():
         output='screen',
         parameters=[
             detection_config,
-            camera_config,
+            {'camera_calibration_file': camera_config},
         ],
     )
 
-    # Pick-place policy node
+    # ── 4. Pick-place policy node (in separate xterm) ───────────────
     policy_node = Node(
         package='manipulators',
         executable='pick_place_policy',
         name='pick_place_policy',
         output='screen',
+        prefix='xterm -e',
         parameters=[pick_place_config],
     )
 
     return LaunchDescription([
         robot_ip_arg,
         control_node,
+        realsense_launch,
         detection_node,
         policy_node,
     ])
