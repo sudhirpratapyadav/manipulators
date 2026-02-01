@@ -16,6 +16,7 @@ import yaml
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image, CameraInfo
+from geometry_msgs.msg import PointStamped
 from cv_bridge import CvBridge
 
 from .detectors.color_detector import ColorDetector
@@ -49,8 +50,26 @@ class DetectorTunerNode(Node):
         self.depth_range = self.get_parameter("depth_range").value
         self.depth_patch_radius = self.get_parameter("depth_patch_radius").value
 
+        # Load initial HSV values from detection YAML if it exists
         hsv_low = list(self.get_parameter("hsv_low").value)
         hsv_high = list(self.get_parameter("hsv_high").value)
+        if self.output_file:
+            try:
+                with open(self.output_file, "r") as f:
+                    det_data = yaml.safe_load(f) or {}
+                params = det_data.get("object_detection_node", {}).get(
+                    "ros__parameters", {}
+                )
+                if "hsv_low" in params:
+                    hsv_low = list(params["hsv_low"])
+                if "hsv_high" in params:
+                    hsv_high = list(params["hsv_high"])
+                self.get_logger().info(
+                    f"Loaded initial HSV from {self.output_file}: "
+                    f"low={hsv_low} high={hsv_high}"
+                )
+            except FileNotFoundError:
+                pass
 
         # -- Load camera extrinsics --
         self.T_robot_camera = np.eye(4)
@@ -75,6 +94,11 @@ class DetectorTunerNode(Node):
         self._latest_depth = None
         self.cam_mtx = None
         self.cam_dist = None
+
+        # -- Publisher --
+        self.object_point_pub = self.create_publisher(
+            PointStamped, "detected_object_point", 10
+        )
 
         # -- Subscriptions --
         color_topic = self.get_parameter("color_topic").value
@@ -107,12 +131,15 @@ class DetectorTunerNode(Node):
                 data = yaml.safe_load(f)
             if "extrinsics" in data:
                 ext = data["extrinsics"]
+                # rvec/tvec encode T_cam_robot (robot→camera).
+                # Invert to get T_robot_camera (camera→robot).
                 rvec = np.array(ext["rvec"], dtype=float).reshape(3, 1)
                 tvec = np.array(ext["tvec"], dtype=float).reshape(3, 1)
                 R, _ = cv2.Rodrigues(rvec)
-                self.T_robot_camera = np.eye(4)
-                self.T_robot_camera[:3, :3] = R
-                self.T_robot_camera[:3, 3] = tvec.flatten()
+                T_cam_robot = np.eye(4)
+                T_cam_robot[:3, :3] = R
+                T_cam_robot[:3, 3] = tvec.flatten()
+                self.T_robot_camera = np.linalg.inv(T_cam_robot)
                 self.get_logger().info(f"Loaded extrinsics from {filepath}")
         except Exception as e:
             self.get_logger().error(f"Failed to load extrinsics: {e}")
@@ -143,14 +170,24 @@ class DetectorTunerNode(Node):
         return [h_lo, s_lo, v_lo], [h_hi, s_hi, v_hi]
 
     def _save(self, hsv_low, hsv_high):
-        """Save current detector config to YAML."""
-        data = {
-            "hsv_low": hsv_low,
-            "hsv_high": hsv_high,
-        }
+        """Save tuned HSV values into the detection YAML (preserving other fields)."""
+        data = {}
+        try:
+            with open(self.output_file, "r") as f:
+                data = yaml.safe_load(f) or {}
+        except FileNotFoundError:
+            pass
+
+        # Update HSV values inside the ROS2 parameter structure
+        params = data.setdefault("object_detection_node", {}).setdefault(
+            "ros__parameters", {}
+        )
+        params["hsv_low"] = hsv_low
+        params["hsv_high"] = hsv_high
+
         with open(self.output_file, "w") as f:
             yaml.dump(data, f, default_flow_style=False, sort_keys=False)
-        self.get_logger().info(f"Saved detector tuning to {self.output_file}")
+        self.get_logger().info(f"Saved HSV tuning to {self.output_file}")
 
     # ------------------------------------------------------------------
 
@@ -233,6 +270,15 @@ class DetectorTunerNode(Node):
                         y_cam = (cy - ppy) * depth_m / fy
                         pt_cam = np.array([x_cam, y_cam, depth_m, 1.0])
                         pt_robot = self.T_robot_camera @ pt_cam
+
+                        # Publish 3D point in robot frame
+                        pt_msg = PointStamped()
+                        pt_msg.header.stamp = self.get_clock().now().to_msg()
+                        pt_msg.header.frame_id = "world"
+                        pt_msg.point.x = float(pt_robot[0])
+                        pt_msg.point.y = float(pt_robot[1])
+                        pt_msg.point.z = float(pt_robot[2])
+                        self.object_point_pub.publish(pt_msg)
 
                 if pt_robot is not None:
                     label = (f"{det.label} ({pt_robot[0]:.3f}, "

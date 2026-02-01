@@ -88,7 +88,7 @@ def generate_launch_description():
     )
 
     # ── 5. Detector tuner node (HSV trackbars) ──────────────────────
-    detector_tuning_yaml = os.path.join(pkg_share, "config", "detector_tuning.yaml")
+    detection_config = os.path.join(pkg_share, "config", "detection.yaml")
     detector_tuner_node = Node(
         package="manipulators",
         executable="detector_tuner_node",
@@ -97,8 +97,8 @@ def generate_launch_description():
         parameters=[
             {
                 "camera_calibration_file": camera_config,
-                "output_file": detector_tuning_yaml,
-            }
+                "output_file": detection_config,
+            },
         ],
     )
 

@@ -1,37 +1,35 @@
 object_detection_node:
   ros__parameters:
-    # Camera calibration file (absolute path or relative to package share)
-    camera_calibration_file: ""
-
-    # Camera topics (realsense2_camera defaults)
-    color_topic: "/camera/camera/color/image_raw"
-    depth_topic: "/camera/camera/aligned_depth_to_color/image_raw"
-    camera_info_topic: "/camera/camera/color/camera_info"
-
-    # Detector type: "color" (add more in src/detectors/__init__.py)
-    detector_type: "color"
-
-    # Color detector parameters (HSV thresholding)
-    # These values detect reddish objects — adjust for your target
-    hsv_low: [0, 120, 70]
-    hsv_high: [10, 255, 255]
-    bgr_low: [0, 0, 0]
-    bgr_high: [255, 255, 255]
-
-    # Crop region [x1, y1, x2, y2] in pixels. Set to full image size to disable.
-    crop: [0, 0, 640, 480]
-
-    # Minimum contour area (pixels) to count as a detection
+    camera_calibration_file: ''
+    color_topic: /camera/camera/color/image_raw
+    depth_topic: /camera/camera/aligned_depth_to_color/image_raw
+    camera_info_topic: /camera/camera/color/camera_info
+    detector_type: color
+    hsv_low:
+    - 143
+    - 106
+    - 96
+    hsv_high:
+    - 179
+    - 255
+    - 229
+    bgr_low:
+    - 0
+    - 0
+    - 0
+    bgr_high:
+    - 255
+    - 255
+    - 255
+    crop:
+    - 0
+    - 0
+    - 640
+    - 480
     min_area: 100
-
-    # Label assigned to detected objects
-    label: "object"
-
-    # Valid depth range (meters) — detections outside this range are discarded
-    depth_range: [0.1, 2.0]
-
-    # Radius of depth patch around detection center for median depth
+    label: object
+    depth_range:
+    - 0.1
+    - 2.0
     depth_patch_radius: 3
-
-    # Detection publish rate (Hz)
     publish_rate: 30.0

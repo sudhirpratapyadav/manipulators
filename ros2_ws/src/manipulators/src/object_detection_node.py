@@ -26,7 +26,6 @@ class ObjectDetectionNode(Node):
 
         # -- Parameters --
         self.declare_parameter("camera_calibration_file", "")
-        self.declare_parameter("detector_config_file", "")
         self.declare_parameter("detector_type", "color")
         # Color detector params (passed through to detector)
         self.declare_parameter("hsv_low", [0, 120, 70])
@@ -71,11 +70,6 @@ class ObjectDetectionNode(Node):
             "min_area": self.get_parameter("min_area").value,
             "label": self.get_parameter("label").value,
         }
-
-        # Override detector params from tuning YAML if provided
-        det_config = self.get_parameter("detector_config_file").value
-        if det_config:
-            detector_kwargs = self._load_detector_config(det_config, detector_kwargs)
 
         self.detector = create_detector(detector_type, **detector_kwargs)
         self.get_logger().info(f"Detector: {detector_type}")
@@ -126,31 +120,20 @@ class ObjectDetectionNode(Node):
 
             if "extrinsics" in data:
                 ext = data["extrinsics"]
+                # rvec/tvec encode T_cam_robot (robot→camera).
+                # Invert to get T_robot_camera (camera→robot).
                 rvec = np.array(ext["rvec"], dtype=float).reshape(3, 1)
                 tvec = np.array(ext["tvec"], dtype=float).reshape(3, 1)
                 R, _ = cv2.Rodrigues(rvec)
-                self.T_robot_camera = np.eye(4)
-                self.T_robot_camera[:3, :3] = R
-                self.T_robot_camera[:3, 3] = tvec.flatten()
+                T_cam_robot = np.eye(4)
+                T_cam_robot[:3, :3] = R
+                T_cam_robot[:3, 3] = tvec.flatten()
+                self.T_robot_camera = np.linalg.inv(T_cam_robot)
                 self.get_logger().info(f"Loaded extrinsics from {filepath}")
             else:
                 self.get_logger().warn(f"No 'extrinsics' key in {filepath}")
         except Exception as e:
             self.get_logger().error(f"Failed to load extrinsics: {e}")
-
-    def _load_detector_config(self, filepath: str, defaults: dict) -> dict:
-        """Load detector params from tuning YAML, merging with defaults."""
-        try:
-            with open(filepath, "r") as f:
-                data = yaml.safe_load(f) or {}
-            for key in ("hsv_low", "hsv_high", "bgr_low", "bgr_high",
-                        "crop", "min_area", "label"):
-                if key in data:
-                    defaults[key] = data[key]
-            self.get_logger().info(f"Loaded detector config from {filepath}")
-        except Exception as e:
-            self.get_logger().warn(f"Failed to load detector config: {e}")
-        return defaults
 
     # ------------------------------------------------------------------
     # Callbacks
